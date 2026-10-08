@@ -1,0 +1,55 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: crud-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_DATABASE: cruddb
+      MARIADB_USER: cruduser
+      MARIADB_PASSWORD: crudpass
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - crud_network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: crudapp:1.0
+    container_name: crud-app
+    restart: unless-stopped
+    environment:
+      APP_PORT: "8080"
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_NAME: cruddb
+      DB_USER: cruduser
+      DB_PASSWORD: crudpass
+    ports:
+      - "8080:8080"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - crud_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  mariadb_data:
+
+networks:
+  crud_network:
+    driver: bridge
